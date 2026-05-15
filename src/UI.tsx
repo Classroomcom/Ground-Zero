@@ -1,16 +1,80 @@
-import { Crosshair, Navigation, Users, Heart } from 'lucide-react';
+import { Crosshair, Navigation, Users, Heart, RefreshCw, Github } from 'lucide-react';
 import { useGameStore } from './store';
+import { useEffect, useState } from 'react';
 
 // 5. Interfaz de Usuario (HTML/CSS Overlay)
 export function UI() {
-  const { health, ammo, maxAmmo, otherPlayers, isLocked } = useGameStore();
+  const { health, ammo, maxAmmo, otherPlayers, isLocked, isReloading, zone, myPosition, myRotation, objectives, githubUser, setGithubAuth } = useGameStore();
+
+  const [authError, setAuthError] = useState("");
+
+  const mapScale = 1.0;
+  const mapCenter = { x: 96, y: 96 }; // w-48 h-48 = 192px / 2 = 96
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Validate origin is from AI Studio preview or localhost
+      const origin = event.origin;
+      if (!origin.endsWith('.run.app') && !origin.includes('localhost')) {
+        return;
+      }
+      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
+        const token = event.data.token;
+        // Fetch user data
+        fetch("https://api.github.com/user", {
+           headers: {
+             Authorization: `Bearer ${token}`
+           }
+        }).then(res => res.json()).then(data => {
+           setGithubAuth(token, data);
+        }).catch(err => {
+           setAuthError("Failed to fetch Github profile.");
+        });
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  const handleGithubConnect = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      setAuthError("");
+      const redirectUri = `${window.location.origin}/auth/github/callback`;
+      const response = await fetch(`/api/auth/github/url?redirectUri=${encodeURIComponent(redirectUri)}`);
+      if (!response.ok) throw new Error('Failed to get auth URL');
+      const { url } = await response.json();
+      
+      const authWindow = window.open(url, 'oauth_popup', 'width=600,height=700');
+      if (!authWindow) {
+        setAuthError('Please allow popups for this site to connect your account.');
+      }
+    } catch (error) {
+       console.error(error);
+       setAuthError('Error connecting to GitHub.');
+    }
+  };
+
+  const healthPercentage = Math.max(0, Math.floor(health));
+  const healthColor = healthPercentage > 60 
+    ? 'bg-gradient-to-r from-[#00ff41] to-[#a8ff78]' 
+    : healthPercentage > 30 
+      ? 'bg-gradient-to-r from-yellow-400 to-yellow-200' 
+      : 'bg-gradient-to-r from-red-600 to-red-400';
 
   return (
     <div className="absolute inset-0 pointer-events-none select-none overflow-hidden font-mono text-[#e0e0e0]">
       
       {/* Crosshair (Centro de pantalla) */}
       <div className="absolute inset-0 flex items-center justify-center">
-        <Crosshair className="text-[#00ff41]/80 w-10 h-10 stroke-[1.5px]" />
+        {isReloading ? (
+          <div className="flex flex-col items-center justify-center translate-y-8">
+            <RefreshCw className="text-[#00d2ff] w-8 h-8 animate-spin mb-2" />
+            <span className="text-xs tracking-widest text-[#00d2ff] uppercase font-bold animate-pulse">Reloading</span>
+          </div>
+        ) : (
+          <Crosshair className="text-[#00ff41]/80 w-10 h-10 stroke-[1.5px]" />
+        )}
       </div>
 
       {/* Instrucciones de Bloqueo */}
@@ -21,8 +85,23 @@ export function UI() {
             <div className="text-[10px] uppercase tracking-[0.2em] opacity-60 mb-2 relative z-10 text-left">System Status: Interrupted</div>
             <h1 className="text-5xl font-black italic tracking-widest relative z-10 whitespace-nowrap">BATTLE ROYALE WEBGL</h1>
             <p className="text-sm opacity-60 tracking-wider relative z-10 text-left pt-4">Haz clic para entrar. Usa W,A,S,D para moverte y Click Izq para disparar.</p>
-            <div className="mt-6 flex justify-start relative z-10">
-              <p className="text-[10px] text-[#00ff41] font-bold uppercase tracking-[0.3em] border border-[#00ff41]/50 bg-[#00ff41]/10 px-4 py-2">
+            <div className="mt-8 pt-6 border-t border-white/10 flex flex-col items-center gap-4 relative z-10 w-full">
+              {githubUser ? (
+                 <div className="flex items-center gap-3 bg-white/5 py-2 px-4 rounded-full border border-white/10 w-full justify-center">
+                    <img src={githubUser.avatar_url} className="w-6 h-6 rounded-full" alt="Avatar"/>
+                    <span className="text-sm font-semibold">{githubUser.login}</span>
+                 </div>
+              ) : (
+                <button 
+                  onClick={handleGithubConnect}
+                  className="flex items-center justify-center gap-3 bg-white hover:bg-gray-200 text-black px-6 py-3 rounded-sm font-bold tracking-wider uppercase text-sm w-full transition-colors pointer-events-auto shadow-[0_0_15px_rgba(255,255,255,0.2)]"
+                >
+                  <Github className="w-5 h-5" />
+                  Conectar con GitHub
+                </button>
+              )}
+              {authError && <div className="text-xs text-red-500">{authError}</div>}
+              <p className="text-[10px] text-[#00ff41] font-bold uppercase tracking-[0.3em] border border-[#00ff41]/50 bg-[#00ff41]/10 px-4 py-2 mt-2 text-center w-full">
                 Arquitectura Base: Three.js + Rapier + Socket.io + Zustand
               </p>
             </div>
@@ -44,31 +123,80 @@ export function UI() {
       {/* HUD - Superior Izquierdo (Minimapa Mock) */}
       <div className="absolute top-8 left-8 w-48 h-48 bg-black/80 border-2 border-white/20 relative rounded-sm overflow-hidden shadow-lg">
         <div className="absolute inset-0 bg-[#1a2b1a] opacity-40"></div>
-        <div className="absolute inset-0 border-[1px] border-dashed border-white/10 m-2"></div>
-        <div className="absolute top-1/4 left-1/4 w-12 h-12 bg-[#00ff41]/20 border border-[#00ff41]/50"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
-            <Navigation className="text-[#00ff41] w-6 h-6 rotate-45" />
+        <div className="absolute inset-0 border-[1px] border-dashed border-white/10 m-2 pointer-events-none"></div>
+        
+        {/* Safe Zone Circle */}
+        <div 
+          className="absolute border-[1.5px] border-[#00ff41]/70 rounded-full bg-[#00ff41]/10 transition-all duration-1000 pointer-events-none shadow-[0_0_15px_rgba(0,255,65,0.4)]"
+          style={{
+            width: `${zone.radius * 2 * mapScale}px`,
+            height: `${zone.radius * 2 * mapScale}px`,
+            left: `${mapCenter.x + (zone.center[0] - myPosition[0]) * mapScale - zone.radius * mapScale}px`,
+            top: `${mapCenter.y + (zone.center[1] - myPosition[2]) * mapScale - zone.radius * mapScale}px`,
+          }}
+        />
+
+        {/* POIs / Objectives */}
+        {objectives.map(obj => (
+          <div key={obj.id} className={`absolute w-3 h-3 ${obj.type === 'BOMB_SITE' ? 'bg-[#ff4b2b]' : 'bg-[#00d2ff]'} rotate-45 transform -translate-x-1/2 -translate-y-1/2 shadow-lg z-10 border border-white/50`}
+            style={{
+              left: `${mapCenter.x + (obj.position[0] - myPosition[0]) * mapScale}px`,
+              top: `${mapCenter.y + (obj.position[2] - myPosition[2]) * mapScale}px`,
+            }}
+          />
+        ))}
+
+        {/* Enemy Players */}
+        {Array.from(otherPlayers.values()).map(p => (
+           <div key={`map_${p.id}`} className="absolute w-2 h-2 bg-[#ff4b2b] rounded-full transform -translate-x-1/2 -translate-y-1/2 box-content border-[1.5px] border-black z-20"
+            style={{
+              left: `${mapCenter.x + (p.position[0] - myPosition[0]) * mapScale}px`,
+              top: `${mapCenter.y + (p.position[2] - myPosition[2]) * mapScale}px`,
+            }}
+          />
+        ))}
+
+        {/* Me (Center) */}
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30">
+            <Navigation className="text-white w-5 h-5 drop-shadow-[0_0_3px_black] fill-white" style={{ transform: `rotate(${(myRotation * -1) - Math.PI / 4}rad)` }} />
         </div>
-        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[9px] uppercase tracking-tighter bg-black/60 px-2 font-bold text-[#e0e0e0]">Sector Alpha</div>
+
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[9px] uppercase tracking-tighter bg-black/60 px-2 font-bold text-[#e0e0e0] z-40 whitespace-nowrap">
+          Sector Alpha [{Math.round(myPosition[0])}, {Math.round(myPosition[2])}]
+        </div>
       </div>
 
       {/* HUD - Inferior (Estado de Jugador) */}
-      <div className="absolute bottom-8 left-8 text-[#e0e0e0] flex flex-col gap-4 w-80">
-        {/* Barra de Vida */}
-        <div className="space-y-1">
-          <div className="flex justify-between text-[11px] font-bold items-center">
-            <div className="flex items-center gap-1">
-                <Heart className={`w-3 h-3 ${health < 30 ? 'text-[#ff4b2b] animate-pulse' : 'text-gray-400'}`} />
-                <span className="tracking-widest">SALUD</span>
-            </div>
-            <span>{Math.max(0, Math.floor(health))}%</span>
+      <div className="absolute bottom-12 left-1/2 transform -translate-x-1/2 text-[#e0e0e0] flex flex-col items-center gap-2 w-96 transform -skew-x-12 z-50">
+        {/* Barra de Vida - Prominently Displayed */}
+        <div className="w-full bg-black/80 border-2 border-white/20 p-2 shadow-[0_0_20px_rgba(0,0,0,0.8)] backdrop-blur-md relative overflow-hidden">
+          <div className="flex justify-between items-baseline mb-2 px-1 text-white relative z-10">
+             <div className="flex items-center gap-2">
+                 <Heart className={`w-5 h-5 ${healthPercentage < 30 ? 'text-red-500 animate-bounce' : 'text-white'}`} style={{ fill: healthPercentage < 30 ? 'currentColor' : 'none' }}/>
+                 <span className="font-black italic tracking-widest text-lg">SALUD</span>
+             </div>
+             <span className="font-black italic text-3xl drop-shadow-md">{healthPercentage}%</span>
           </div>
-          <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden border border-white/5">
-            <div 
-              className={`h-full transition-all duration-300 ${health > 30 ? 'bg-gradient-to-r from-[#00ff41] to-[#a8ff78]' : 'bg-[#ff4b2b]'}`}
-              style={{ width: `${Math.max(0, health)}%` }}
-            />
+          <div className="w-full h-8 bg-black/50 border border-white/10 relative z-10">
+             <div 
+               className={`h-full transition-all duration-300 ${healthColor}`}
+               style={{ width: `${healthPercentage}%` }}
+             />
+             {/* Tick marks */}
+             <div className="absolute inset-0 flex justify-between px-[10%] opacity-20 pointer-events-none">
+                <div className="w-px h-full bg-white bg-opacity-50"></div>
+                <div className="w-px h-full bg-white bg-opacity-50"></div>
+                <div className="w-px h-full bg-white bg-opacity-50"></div>
+                <div className="w-px h-full bg-white bg-opacity-50"></div>
+                <div className="w-px h-full bg-white bg-opacity-50"></div>
+                <div className="w-px h-full bg-white bg-opacity-50"></div>
+                <div className="w-px h-full bg-white bg-opacity-50"></div>
+                <div className="w-px h-full bg-white bg-opacity-50"></div>
+                <div className="w-px h-full bg-white bg-opacity-50"></div>
+             </div>
           </div>
+          {/* Decorative scanline overlay */}
+          <div className="absolute inset-0 pointer-events-none opacity-20 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_4px] z-20"></div>
         </div>
       </div>
 

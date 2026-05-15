@@ -13,6 +13,7 @@ const keyboardMap = [
   { name: 'jump', keys: ['Space'] },
   { name: 'sprint', keys: ['Shift'] },
   { name: 'fire', keys: ['Click'] }, // Virtual mapping for fire is complex, usually handled via DOM events or specific hooks, but we'll use a custom state or mouse listener in Player
+  { name: 'reload', keys: ['KeyR', 'r', 'R'] }
 ];
 
 export default function App() {

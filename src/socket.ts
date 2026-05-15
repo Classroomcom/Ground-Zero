@@ -10,6 +10,15 @@ export function initSocket() {
     useGameStore.getState().addChatMessage({ user: 'System', text: 'Connected to server!' });
   });
 
+  socket.on('init', (data) => {
+    if (data.zone) useGameStore.getState().setZone(data.zone.center, data.zone.radius);
+    if (data.objectives) useGameStore.getState().setObjectives(data.objectives);
+  });
+
+  socket.on('zone_update', (zone) => {
+    useGameStore.getState().setZone(zone.center, zone.radius);
+  });
+
   socket.on('player_join', (player) => {
     useGameStore.getState().updatePlayer(player.id, player);
     useGameStore.getState().addChatMessage({ user: 'System', text: `Player ${player.id.substring(0, 4)} joined.` });

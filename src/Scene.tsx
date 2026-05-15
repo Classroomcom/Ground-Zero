@@ -1,15 +1,44 @@
-import { PointerLockControls } from '@react-three/drei';
+import { PointerLockControls, Html } from '@react-three/drei';
 import { Physics, RigidBody } from '@react-three/rapier';
 import { EffectComposer, Bloom, SSAO, Vignette } from '@react-three/postprocessing';
 import { Player } from './Player';
 import { OtherPlayer } from './OtherPlayer';
-import { useGameStore } from './store';
-import { useEffect } from 'react';
-import { useThree } from '@react-three/fiber';
+import { useGameStore, Objective } from './store';
+import { useEffect, useRef } from 'react';
+import { useThree, useFrame } from '@react-three/fiber';
+import { DoubleSide, Mesh } from 'three';
+
+// Componente para animar los marcadores de objetivo
+function ObjectiveMarker({ objective }: { objective: Objective }) {
+  const meshRef = useRef<Mesh>(null);
+  
+  useFrame((state) => {
+    if (meshRef.current) {
+      meshRef.current.rotation.y += 0.02;
+      meshRef.current.position.y = objective.position[1] + 5 + Math.sin(state.clock.elapsedTime * 2) * 0.5;
+    }
+  });
+
+  const color = objective.type === 'BOMB_SITE' ? '#ff4b2b' : '#00d2ff';
+
+  return (
+    <group position={objective.position}>
+      <mesh ref={meshRef} position={[0, 5, 0]}>
+        <octahedronGeometry args={[1, 0]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1} wireframe />
+      </mesh>
+      {/* Etiqueta HTML Flotante encima del objetivo */}
+      <Html position={[0, 7, 0]} center className="pointer-events-none select-none text-[10px] uppercase font-bold text-[#e0e0e0] bg-black/80 border border-[#00ff41]/30 px-3 py-1 backdrop-blur-sm whitespace-nowrap shadow-[0_0_10px_rgba(0,255,65,0.2)]">
+        <div>{objective.name}</div>
+        <div className="text-[#00ff41]">{objective.type}</div>
+      </Html>
+    </group>
+  );
+}
 
 // 1. Motor de Renderizado (Three.js + WebGL)
 export function GameScene() {
-  const { otherPlayers, setLocked } = useGameStore();
+  const { otherPlayers, setLocked, zone, objectives } = useGameStore();
   const otherPlayersArray = Array.from(otherPlayers.values());
   const { gl } = useThree();
 
@@ -60,6 +89,17 @@ export function GameScene() {
         {/* Instancias de Otros Jugadores */}
         {otherPlayersArray.map((p) => (
           <OtherPlayer key={p.id} id={p.id} position={p.position} rotation={p.rotation} />
+        ))}
+
+        {/* BR Zone Cylinder (Safe Area Wall) */}
+        <mesh position={[zone.center[0], 0, zone.center[1]]}>
+          <cylinderGeometry args={[zone.radius, zone.radius, 100, 64, 1, true]} />
+          <meshStandardMaterial color="#00ff41" transparent opacity={0.15} side={DoubleSide} emissive="#00ff41" emissiveIntensity={0.5} depthWrite={false} />
+        </mesh>
+
+        {/* Objectives */}
+        {objectives.map((obj) => (
+          <ObjectiveMarker key={obj.id} objective={obj} />
         ))}
 
         {/* Detailed Map Generation */}
@@ -145,7 +185,6 @@ export function GameScene() {
       {/* Post-procesamiento para realismo (Post-Processing) */}
       <EffectComposer disableNormalPass>
         <Bloom luminanceThreshold={0.5} mipmapBlur intensity={1.5} />
-        <SSAO radius={0.5} intensity={20} luminanceInfluence={0.5} color="black" />
         <Vignette eskil={false} offset={0.1} darkness={1.1} />
       </EffectComposer>
     </>

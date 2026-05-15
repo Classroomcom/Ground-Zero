@@ -1,6 +1,7 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Mesh, MathUtils } from 'three';
+import { Group, MathUtils, Vector3 } from 'three';
+import { Character } from './Character';
 
 interface OtherPlayerProps {
   id: string;
@@ -9,26 +10,39 @@ interface OtherPlayerProps {
 }
 
 export function OtherPlayer({ id, position, rotation }: OtherPlayerProps) {
-  const meshRef = useRef<Mesh>(null);
+  const groupRef = useRef<Group>(null);
+  const [action, setAction] = useState('idle');
+  const actionRef = useRef('idle');
+  const lastPos = useRef(new Vector3(...position));
 
   useFrame(() => {
-    if (!meshRef.current) return;
+    if (!groupRef.current) return;
     
-    // 3. Sistema Multijugador - Interpolación de Entidades (Entity Interpolation)
-    // Para evitar saltos lagosos de red, interpolamos LERP desde la posición visual actual
-    // hacia la posición lógica más reciente recibida por red.
-    meshRef.current.position.lerp({ x: position[0], y: position[1], z: position[2] }, 0.2);
+    const targetPos = new Vector3(...position);
+    const dist = targetPos.distanceTo(lastPos.current);
     
-    // Smooth rotation using slerp would be best, using simple lerp or angles for now
-    meshRef.current.rotation.x = MathUtils.lerp(meshRef.current.rotation.x, rotation[0], 0.2);
-    meshRef.current.rotation.y = MathUtils.lerp(meshRef.current.rotation.y, rotation[1], 0.2);
-    meshRef.current.rotation.z = MathUtils.lerp(meshRef.current.rotation.z, rotation[2], 0.2);
+    const nextAction = dist > 0.05 ? 'run' : 'idle';
+    if (actionRef.current !== nextAction) {
+      actionRef.current = nextAction;
+      setAction(nextAction);
+    }
+    
+    lastPos.current.lerp(targetPos, 0.2);
+    
+    groupRef.current.position.copy(lastPos.current);
+    groupRef.current.position.y -= 1; // Align to floor
+    
+    // Add Math.PI so they face the direction properly if model implies it
+    groupRef.current.rotation.y = MathUtils.lerp(groupRef.current.rotation.y, rotation[1] + Math.PI, 0.2);
   });
 
   return (
-    <mesh ref={meshRef} position={position} userData={{ isPlayer: true, playerId: id }}>
-      <capsuleGeometry args={[0.5, 1, 4, 8]} />
-      <meshStandardMaterial color="red" roughness={0.7} />
-    </mesh>
+    <group ref={groupRef} userData={{ isPlayer: true, playerId: id }}>
+       <mesh position={[0, 1, 0]} visible={false} userData={{ isPlayer: true, playerId: id }}>
+         <capsuleGeometry args={[0.5, 1, 4, 8]} />
+         <meshBasicMaterial transparent opacity={0.5} color="red" />
+       </mesh>
+      <Character actionName={action} />
+    </group>
   );
 }
