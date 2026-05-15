@@ -1,0 +1,6 @@
+{
+  "name": "WebGL Battle Royale Tech Demo",
+  "description": "A technical prototype of a multiplayer FPS Battle Royale featuring Three.js rendering, Rapier physics, WebSocket multiplayer sync, and a React UI overlay.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
