@@ -89,61 +89,6 @@ async function startServer() {
     });
   });
 
-  app.get('/api/auth/github/url', (req, res) => {
-    // Determine dynamically from origin context headers or default to hardcoded. Actually we use what oauth skill says, `window.location.origin` inside UI to get URL then pass it here, or just let client pass callback URL.
-    const redirectUri = req.query.redirectUri as string;
-    const params = new URLSearchParams({
-      client_id: process.env.GITHUB_CLIENT_ID || '',
-      redirect_uri: redirectUri,
-      scope: 'user:email',
-    });
-    const authUrl = `https://github.com/login/oauth/authorize?${params}`;
-    res.json({ url: authUrl });
-  });
-
-  app.get(['/auth/github/callback', '/auth/github/callback/'], async (req, res) => {
-    const { code } = req.query;
-    try {
-      const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          client_id: process.env.GITHUB_CLIENT_ID,
-          client_secret: process.env.GITHUB_CLIENT_SECRET,
-          code,
-        }),
-      });
-      
-      if (tokenRes.ok) {
-          const tokenData = await tokenRes.json();
-          // Send success message to parent window and close popup
-          res.send(`
-            <html>
-              <body>
-                <script>
-                  if (window.opener) {
-                    window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS', token: '${tokenData.access_token}' }, '*');
-                    window.close();
-                  } else {
-                    window.location.href = '/';
-                  }
-                </script>
-                <p>Authentication successful. This window should close automatically.</p>
-              </body>
-            </html>
-          `);
-          return;
-      }
-    } catch(e) { 
-        console.error("Github Auth Error", e);
-    }
-  
-    res.send(`<html><body><p>Authentication Failed</p></body></html>`);
-  });
-
   // Vite Middleware para Development (o archivos estáticos en Prod)
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

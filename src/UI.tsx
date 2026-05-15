@@ -1,60 +1,14 @@
-import { Crosshair, Navigation, Users, Heart, RefreshCw, Github } from 'lucide-react';
+import { Crosshair, Navigation, Users, Heart, RefreshCw } from 'lucide-react';
 import { useGameStore } from './store';
 import { useEffect, useState } from 'react';
 
 // 5. Interfaz de Usuario (HTML/CSS Overlay)
 export function UI() {
-  const { health, ammo, maxAmmo, otherPlayers, isLocked, isReloading, zone, myPosition, myRotation, objectives, githubUser, setGithubAuth } = useGameStore();
-
-  const [authError, setAuthError] = useState("");
+  const { health, ammo, maxAmmo, otherPlayers, isLocked, isReloading, zone, myPosition, myRotation, objectives } = useGameStore();
 
   const mapScale = 1.0;
   const mapCenter = { x: 96, y: 96 }; // w-48 h-48 = 192px / 2 = 96
-
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // Validate origin is from AI Studio preview or localhost
-      const origin = event.origin;
-      if (!origin.endsWith('.run.app') && !origin.includes('localhost')) {
-        return;
-      }
-      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
-        const token = event.data.token;
-        // Fetch user data
-        fetch("https://api.github.com/user", {
-           headers: {
-             Authorization: `Bearer ${token}`
-           }
-        }).then(res => res.json()).then(data => {
-           setGithubAuth(token, data);
-        }).catch(err => {
-           setAuthError("Failed to fetch Github profile.");
-        });
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
-
-  const handleGithubConnect = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      setAuthError("");
-      const redirectUri = `${window.location.origin}/auth/github/callback`;
-      const response = await fetch(`/api/auth/github/url?redirectUri=${encodeURIComponent(redirectUri)}`);
-      if (!response.ok) throw new Error('Failed to get auth URL');
-      const { url } = await response.json();
-      
-      const authWindow = window.open(url, 'oauth_popup', 'width=600,height=700');
-      if (!authWindow) {
-        setAuthError('Please allow popups for this site to connect your account.');
-      }
-    } catch (error) {
-       console.error(error);
-       setAuthError('Error connecting to GitHub.');
-    }
-  };
-
+  
   const healthPercentage = Math.max(0, Math.floor(health));
   const healthColor = healthPercentage > 60 
     ? 'bg-gradient-to-r from-[#00ff41] to-[#a8ff78]' 
@@ -86,21 +40,6 @@ export function UI() {
             <h1 className="text-5xl font-black italic tracking-widest relative z-10 whitespace-nowrap">BATTLE ROYALE WEBGL</h1>
             <p className="text-sm opacity-60 tracking-wider relative z-10 text-left pt-4">Haz clic para entrar. Usa W,A,S,D para moverte y Click Izq para disparar.</p>
             <div className="mt-8 pt-6 border-t border-white/10 flex flex-col items-center gap-4 relative z-10 w-full">
-              {githubUser ? (
-                 <div className="flex items-center gap-3 bg-white/5 py-2 px-4 rounded-full border border-white/10 w-full justify-center">
-                    <img src={githubUser.avatar_url} className="w-6 h-6 rounded-full" alt="Avatar"/>
-                    <span className="text-sm font-semibold">{githubUser.login}</span>
-                 </div>
-              ) : (
-                <button 
-                  onClick={handleGithubConnect}
-                  className="flex items-center justify-center gap-3 bg-white hover:bg-gray-200 text-black px-6 py-3 rounded-sm font-bold tracking-wider uppercase text-sm w-full transition-colors pointer-events-auto shadow-[0_0_15px_rgba(255,255,255,0.2)]"
-                >
-                  <Github className="w-5 h-5" />
-                  Conectar con GitHub
-                </button>
-              )}
-              {authError && <div className="text-xs text-red-500">{authError}</div>}
               <p className="text-[10px] text-[#00ff41] font-bold uppercase tracking-[0.3em] border border-[#00ff41]/50 bg-[#00ff41]/10 px-4 py-2 mt-2 text-center w-full">
                 Arquitectura Base: Three.js + Rapier + Socket.io + Zustand
               </p>

@@ -2,7 +2,10 @@ import { io, Socket } from 'socket.io-client';
 import { useGameStore } from './store';
 
 // We connect to the current host
-export const socket: Socket = io();
+// If hosted on GitHub Pages, the backend won't exist locally on that domain, 
+// so this will fail gracefully or you can hardcode a production backend URL here.
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || undefined;
+export const socket: Socket = io(BACKEND_URL);
 
 // 3. Sistema Multijugador - Arquitectura Frontend (WebSockets)
 export function initSocket() {

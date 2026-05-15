@@ -38,7 +38,6 @@ interface GameState {
   removePlayer: (id: string) => void;
   addChatMessage: (msg: { user: string; text: string }) => void;
   setLocked: (locked: boolean) => void;
-  setGithubAuth: (token: string | null, user: any | null) => void;
 }
 
 export const useGameStore = create<GameState>((set) => ({
@@ -53,8 +52,6 @@ export const useGameStore = create<GameState>((set) => ({
   otherPlayers: new Map(),
   chat: [],
   isLocked: false,
-  githubToken: null,
-  githubUser: null,
   setHealth: (health) => set({ health }),
   setAmmo: (ammo) => set({ ammo }),
   setIsReloading: (isReloading) => set({ isReloading }),
@@ -76,5 +73,4 @@ export const useGameStore = create<GameState>((set) => ({
     chat: [...state.chat.slice(-4), msg] // Keep last 5 messages
   })),
   setLocked: (isLocked) => set({ isLocked }),
-  setGithubAuth: (token, user) => set({ githubToken: token, githubUser: user }),
 }));
